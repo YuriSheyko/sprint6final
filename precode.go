@@ -53,11 +53,11 @@ func HendlerGetAllTasks(res http.ResponseWriter, req *http.Request) {
 
 	if err != nil {
 		fmt.Printf("ошибка при сериализации в json: %s\n", err.Error())
-		res.WriteHeader(400)
+		http.Error(res, "serialization error", http.StatusInternalServerError)
 		return
 	}
 
-	res.WriteHeader(201)
+	res.WriteHeader(http.StatusOK)
 
 	res.Write(buffer.Bytes())
 
@@ -70,48 +70,38 @@ func HendlerPostTask(res http.ResponseWriter, req *http.Request) {
 	err := json.NewDecoder(req.Body).Decode(&task)
 	if err != nil {
 		fmt.Printf("ошибка при десериализации из json: %s\n", err.Error())
-		res.WriteHeader(400)
+		http.Error(res, "deserialization error", http.StatusBadRequest)
 		return
 	}
 	if _, ok := tasks[task.ID]; ok {
 		fmt.Println("элемент уже есть в массиве")
-		res.WriteHeader(400)
+		http.Error(res, "element allready exists", http.StatusBadRequest)
 		return
 	}
 	tasks[task.ID] = task
-	res.WriteHeader(201)
-
+	res.WriteHeader(http.StatusCreated)
 }
 
 func HendlerGetIDtask(res http.ResponseWriter, req *http.Request) {
 	res.Header().Set("Content-Type", "application/json")
 	id := chi.URLParam(req, "id")
-	var task *Task = nil
+	task, ok := tasks[id]
 
-	for _, item := range tasks {
-		if item.ID == id {
-			task = &item
-			break
-		}
-	}
-	if task == nil {
-		res.WriteHeader(400)
+	if !ok {
+		fmt.Println("Элемента нет в маппе")
+		http.Error(res, "task not found", http.StatusBadRequest)
 		return
 	}
-	buffer := new(bytes.Buffer)
-	buffer.Reset()
-	err := json.NewEncoder(buffer).Encode(task)
+
+	err := json.NewEncoder(res).Encode(task)
 
 	if err != nil {
 		fmt.Printf("ошибка при сериализации в json: %s\n", err.Error())
-		res.WriteHeader(400)
+		http.Error(res, "serialization error", http.StatusBadRequest)
 		return
 	}
 
-	res.WriteHeader(201)
-
-	res.Write(buffer.Bytes())
-
+	res.WriteHeader(http.StatusOK)
 }
 
 func HendlerDeletTask(res http.ResponseWriter, req *http.Request) {
@@ -119,23 +109,19 @@ func HendlerDeletTask(res http.ResponseWriter, req *http.Request) {
 	id := chi.URLParam(req, "id")
 
 	_, ok := tasks[id]
-
 	if !ok {
 		fmt.Println("Элемента нет в маппе")
-		res.WriteHeader(400)
+		http.Error(res, "task not found", http.StatusBadRequest)
 		return
 	}
 	delete(tasks, id)
-	res.WriteHeader(201)
-
+	res.WriteHeader(http.StatusOK)
 }
 
 func main() {
 	r := chi.NewRouter()
-
 	// здесь регистрируйте ваши обработчики
 	// ...
-
 	r.Get("/tasks", HendlerGetAllTasks)
 	r.Post("/tasks", HendlerPostTask)
 	r.Get("/tasks/{id}", HendlerGetIDtask)
